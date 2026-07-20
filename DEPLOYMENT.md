@@ -28,8 +28,8 @@ In Google AI Studio, create a key for this project and enable the paid tier if y
 private repository code. Store the key only in Railway as `GEMINI_API_KEY`; do not add it to the
 repository, Vercel, browser console, or a `VITE_` variable.
 
-CodePilot uses `gemini-2.5-flash` for structured generation and
-`gemini-embedding-001` at 768 dimensions for Qdrant retrieval. Gemini requests originate only
+CodePilot uses `gemini-3.5-flash` for structured generation and
+`gemini-embedding-2` at 768 dimensions for Qdrant retrieval. Gemini requests originate only
 from the FastAPI service.
 
 ## 2. Create the Railway services
@@ -57,8 +57,8 @@ QDRANT_URL=http://${{Qdrant.RAILWAY_PRIVATE_DOMAIN}}:6333
 REPOSITORY_STORAGE_ROOT=/app/data/repositories
 AI_PROVIDER=gemini
 GEMINI_API_KEY=<paste the key from Google AI Studio>
-GEMINI_GENERATION_MODEL=gemini-2.5-flash
-GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_GENERATION_MODEL=gemini-3.5-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2
 GEMINI_EMBEDDING_DIMENSIONS=768
 JWT_SECRET_KEY=<new random secret, at least 32 characters>
 # Railway's internal health probe uses an internal Host header. This is intentionally `*`; public

@@ -88,8 +88,8 @@ def gemini_settings() -> Settings:
         database_url="sqlite+aiosqlite://",
         ai_provider=AiProvider.GEMINI,
         gemini_api_key=SecretStr("test-gemini-key"),
-        gemini_generation_model="gemini-2.5-flash",
-        gemini_embedding_model="gemini-embedding-001",
+        gemini_generation_model="gemini-3.5-flash",
+        gemini_embedding_model="gemini-embedding-2",
         gemini_embedding_dimensions=768,
     )
 
@@ -112,7 +112,7 @@ async def test_gemini_summary_and_embeddings_use_server_side_api(
     summary = await GeminiProjectSummaryAgent(gemini_settings).generate(context)
     vectors = await GeminiEmbeddingProvider(gemini_settings).embed(["first", "second"])
 
-    assert summary.model == "gemini/gemini-2.5-flash"
+    assert summary.model == "gemini/gemini-3.5-flash"
     assert summary.content["overview"]["summary"] == "Grounded summary."
     assert vectors == [[0.1, 0.2], [0.1, 0.2]]
     generation_call, embedding_call = _FakeHttpClient.calls
@@ -164,14 +164,14 @@ async def test_gemini_grounded_chat_returns_only_model_citations(
 
     assert result == answer["answer"]
     assert citations == (str(source.chunk.id),)
-    assert model == "gemini/gemini-2.5-flash"
+    assert model == "gemini/gemini-3.5-flash"
 
 
 def test_gemini_settings_select_gemini_adapters(gemini_settings: Settings) -> None:
     assert isinstance(_project_summary_agent(gemini_settings), GeminiProjectSummaryAgent)
     assert isinstance(_repository_chat_embeddings(gemini_settings), GeminiEmbeddingProvider)
     assert isinstance(_repository_chat_agent(gemini_settings), GeminiGroundedChatAgent)
-    assert _embedding_model_name(gemini_settings) == "gemini/gemini-embedding-001/768"
+    assert _embedding_model_name(gemini_settings) == "gemini/gemini-embedding-2/768"
 
 
 def test_railway_postgres_url_is_normalized_to_asyncpg() -> None:

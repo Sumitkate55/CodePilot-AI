@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     openai_timeout_seconds: int = Field(default=90, ge=10, le=600)
     gemini_api_key: SecretStr | None = None
-    # Gemini 2.5 Flash is a stable, low-latency model with structured-output support.
-    gemini_generation_model: str = "gemini-2.5-flash"
-    gemini_embedding_model: str = "gemini-embedding-001"
+    # Gemini 3.5 Flash is the current stable low-latency model with structured-output support.
+    gemini_generation_model: str = "gemini-3.5-flash"
+    gemini_embedding_model: str = "gemini-embedding-2"
     gemini_embedding_dimensions: int = Field(default=768, ge=128, le=3072)
     gemini_timeout_seconds: int = Field(default=120, ge=10, le=600)
     ollama_base_url: str = "http://127.0.0.1:11434"
