@@ -5,11 +5,11 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEFAULT_DEVELOPMENT_JWT_SECRET = "development-only-secret-change-before-production-32-chars"
 
@@ -48,8 +48,14 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     log_level: str = "INFO"
     database_url: str = "postgresql+asyncpg://codepilot:codepilot@localhost:5432/codepilot"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
-    trusted_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+    # Pydantic Settings otherwise tries to JSON-decode list environment variables before
+    # ``parse_list`` can support the conventional comma-separated deployment value.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
+    trusted_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1"]
+    )
     jwt_secret_key: SecretStr = SecretStr(DEFAULT_DEVELOPMENT_JWT_SECRET)
     jwt_algorithm: str = "HS256"
     ai_provider: AiProvider = AiProvider.OPENAI
