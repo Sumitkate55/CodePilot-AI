@@ -11,7 +11,11 @@ COPY apps/api/src ./src
 COPY apps/api/alembic ./alembic
 COPY apps/api/alembic.ini ./
 
-RUN python -m pip install --upgrade pip && python -m pip install .
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --upgrade pip \
+    && python -m pip install .
 
 EXPOSE 8080
 
