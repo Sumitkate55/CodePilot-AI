@@ -1,0 +1,2 @@
+"""Repository documentation domain types."""
+
