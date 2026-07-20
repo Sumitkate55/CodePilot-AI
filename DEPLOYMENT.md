@@ -3,7 +3,8 @@
 This deployment uses Vercel for the public React application and Railway for the private API,
 PostgreSQL, Qdrant, and repository file storage. Only the API is publicly reachable. PostgreSQL,
 Qdrant, and the uploaded/cloned repositories remain on Railway's private network or attached
-volumes.
+volumes. The live demo is https://codepilot-ai-hackathon.vercel.app and its API health endpoint is
+https://api-production-f51d.up.railway.app/api/v1/health.
 
 ## Hosted architecture
 
@@ -16,7 +17,7 @@ Vercel (React/Vite)
   ▼
 Railway API (FastAPI)
   ├── Railway PostgreSQL (private managed service)
-  ├── Railway Qdrant (private Docker service + persistent volume)
+  ├── Railway Qdrant (private Docker service)
   ├── Railway repository volume at /app/data/repositories
   └── Gemini API (server-side only; its key is never sent to the browser)
 ```
@@ -37,10 +38,11 @@ Create one Railway project named **CodePilot AI** and add:
 
 1. A managed **PostgreSQL** service named `Postgres`.
 2. A **Docker Image** service named `Qdrant` using `qdrant/qdrant:v1.13.6`.
-   Attach a Railway volume at `/qdrant/storage`. Do not generate a public domain for it.
+   Do not generate a public domain for it.
 3. A GitHub repository service named `API` from this repository's `main` branch. Railway reads
    the root `railway.toml` and `Dockerfile.railway`. Attach a Railway volume at
-   `/app/data/repositories`.
+   `/app/data/repositories`. On Railway Free, use this one available application volume for source;
+   Qdrant indexes can be rebuilt from source with **Index repository**.
 
 Generate a public domain only for the `API` service.
 
@@ -59,7 +61,9 @@ GEMINI_GENERATION_MODEL=gemini-2.5-flash
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
 GEMINI_EMBEDDING_DIMENSIONS=768
 JWT_SECRET_KEY=<new random secret, at least 32 characters>
-TRUSTED_HOSTS=${{RAILWAY_PUBLIC_DOMAIN}}
+# Railway's internal health probe uses an internal Host header. This is intentionally `*`; public
+# access is still protected by HTTPS, owner-scoped authorization, private data services, and CORS.
+TRUSTED_HOSTS=*
 ```
 
 Generate the JWT secret locally with `openssl rand -hex 32`, then paste only its output into the
@@ -89,7 +93,7 @@ Copy the resulting Vercel production URL and add it to the API's Railway variabl
 the API:
 
 ```dotenv
-CORS_ORIGINS=https://<your-vercel-domain>
+CORS_ORIGINS=https://codepilot-ai-hackathon.vercel.app
 ```
 
 Production refresh cookies use `Secure; HttpOnly; SameSite=None` because the Vercel UI and Railway

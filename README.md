@@ -6,9 +6,10 @@ refactoring proposals, unit-test generation, and documentation generation.
 
 ## Hosted demonstration
 
-The production deployment is prepared for a public Vercel application backed by a private Railway
-API, PostgreSQL, Qdrant, persistent repository storage, and server-side Gemini. See
-[DEPLOYMENT.md](DEPLOYMENT.md) for the exact secure deployment layout and verification steps.
+The live evaluator demo is [codepilot-ai-hackathon.vercel.app](https://codepilot-ai-hackathon.vercel.app).
+It is backed by a public Railway API with private PostgreSQL, Qdrant, persistent repository storage,
+and server-side Gemini. See [DEPLOYMENT.md](DEPLOYMENT.md) for the exact secure deployment layout
+and verification steps.
 
 For a quick end-to-end evaluation after opening the hosted application:
 
@@ -90,8 +91,10 @@ docker compose down -v
 - Each repository is scoped to its authenticated owner; IDs alone do not grant access.
 - Repository indexing excludes `.env`, credential-like files, and unsafe/binary paths before any
   embedding request is made.
-- Production uses private Railway networking for PostgreSQL and Qdrant, plus persistent volumes for
-  repository data and vectors. Only the FastAPI API receives a public domain.
+- Production uses private Railway networking for PostgreSQL and Qdrant. Only the FastAPI API receives
+  a public domain; repository source is on a persistent API volume. The Railway Free plan can keep one
+  application volume, so its private Qdrant index is rebuilt with **Index repository** if the Qdrant
+  service is restarted.
 - JWT secrets, database URLs, Qdrant addresses, and Gemini credentials are stored as backend
   environment variables. They are never included in the Vite client bundle.
 - Repository chat answers are constrained to retrieved source chunks and return traceable file and
