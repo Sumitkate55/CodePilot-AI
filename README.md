@@ -4,7 +4,13 @@ CodePilot AI turns a repository into an engineering workspace with repository in
 architecture maps, source-grounded chat, AI summaries, code explanations, code review,
 refactoring proposals, unit-test generation, and documentation generation.
 
-## Examiner quick start
+## Live demonstration
+
+For assessment, share the supplied HTTPS **live-demo link** together with this GitHub repository.
+The live demo opens the complete application directly in a browser: no installation is required by
+the reviewer. It is backed by the same Docker deployment documented below.
+
+## Run locally
 
 ### Prerequisites
 
