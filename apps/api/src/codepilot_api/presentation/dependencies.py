@@ -30,6 +30,10 @@ from codepilot_api.infrastructure.auth.passwords import Argon2PasswordManager
 from codepilot_api.infrastructure.auth.repository import SqlAlchemyAuthRepository
 from codepilot_api.infrastructure.auth.tokens import JwtTokenIssuer
 from codepilot_api.infrastructure.chat.chunker import SafeRepositoryChunker
+from codepilot_api.infrastructure.chat.gemini_repository_chat import (
+    GeminiEmbeddingProvider,
+    GeminiGroundedChatAgent,
+)
 from codepilot_api.infrastructure.chat.index_store import SqlAlchemyRepositoryChatIndexStore
 from codepilot_api.infrastructure.chat.ollama_repository_chat import (
     OllamaEmbeddingProvider,
@@ -46,11 +50,17 @@ from codepilot_api.infrastructure.database.session import get_session
 from codepilot_api.infrastructure.documentation.documentation_store import (
     SqlAlchemyDocumentationStore,
 )
+from codepilot_api.infrastructure.documentation.gemini_documentation_agent import (
+    GeminiDocumentationAgent,
+)
 from codepilot_api.infrastructure.documentation.ollama_documentation_agent import (
     OllamaDocumentationAgent,
 )
 from codepilot_api.infrastructure.documentation.openai_documentation_agent import (
     OpenAIDocumentationAgent,
+)
+from codepilot_api.infrastructure.explanations.gemini_code_explanation_agent import (
+    GeminiCodeExplanationAgent,
 )
 from codepilot_api.infrastructure.explanations.ollama_code_explanation_agent import (
     OllamaCodeExplanationAgent,
@@ -58,6 +68,7 @@ from codepilot_api.infrastructure.explanations.ollama_code_explanation_agent imp
 from codepilot_api.infrastructure.explanations.openai_code_explanation_agent import (
     OpenAICodeExplanationAgent,
 )
+from codepilot_api.infrastructure.refactoring.gemini_refactoring_agent import GeminiRefactoringAgent
 from codepilot_api.infrastructure.refactoring.ollama_refactoring_agent import OllamaRefactoringAgent
 from codepilot_api.infrastructure.refactoring.openai_refactoring_agent import OpenAIRefactoringAgent
 from codepilot_api.infrastructure.refactoring.proposal_store import SqlAlchemyRefactorProposalStore
@@ -70,6 +81,9 @@ from codepilot_api.infrastructure.repositories.importer import SecureWorkspaceIm
 from codepilot_api.infrastructure.repositories.storage import LocalRepositoryStorage
 from codepilot_api.infrastructure.reviews.review_store import SqlAlchemyRepositoryCodeReviewStore
 from codepilot_api.infrastructure.reviews.reviewer import SecureRepositoryCodeReviewer
+from codepilot_api.infrastructure.summaries.gemini_project_summary_agent import (
+    GeminiProjectSummaryAgent,
+)
 from codepilot_api.infrastructure.summaries.ollama_project_summary_agent import (
     OllamaProjectSummaryAgent,
 )
@@ -77,6 +91,9 @@ from codepilot_api.infrastructure.summaries.openai_project_summary_agent import 
     OpenAIProjectSummaryAgent,
 )
 from codepilot_api.infrastructure.summaries.summary_store import SqlAlchemyProjectSummaryStore
+from codepilot_api.infrastructure.test_generation.gemini_unit_test_agent import (
+    GeminiUnitTestGenerationAgent,
+)
 from codepilot_api.infrastructure.test_generation.ollama_unit_test_agent import (
     OllamaUnitTestGenerationAgent,
 )
@@ -299,6 +316,8 @@ def _project_summary_agent(settings):
     """Choose the configured generation adapter without leaking it into application services."""
     if settings.ai_provider.value == "ollama":
         return OllamaProjectSummaryAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiProjectSummaryAgent(settings)
     return OpenAIProjectSummaryAgent(settings)
 
 
@@ -306,6 +325,8 @@ def _code_explanation_agent(settings):
     """Choose the configured explanation adapter."""
     if settings.ai_provider.value == "ollama":
         return OllamaCodeExplanationAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiCodeExplanationAgent(settings)
     return OpenAICodeExplanationAgent(settings)
 
 
@@ -313,6 +334,8 @@ def _refactoring_agent(settings):
     """Choose the provider-specific refactoring adapter without leaking it into use cases."""
     if settings.ai_provider.value == "ollama":
         return OllamaRefactoringAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiRefactoringAgent(settings)
     return OpenAIRefactoringAgent(settings)
 
 
@@ -320,6 +343,8 @@ def _unit_test_generation_agent(settings):
     """Choose the provider-specific test generator without leaking it into use cases."""
     if settings.ai_provider.value == "ollama":
         return OllamaUnitTestGenerationAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiUnitTestGenerationAgent(settings)
     return OpenAIUnitTestGenerationAgent(settings)
 
 
@@ -327,6 +352,8 @@ def _documentation_agent(settings):
     """Choose the provider-specific documentation generator."""
     if settings.ai_provider.value == "ollama":
         return OllamaDocumentationAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiDocumentationAgent(settings)
     return OpenAIDocumentationAgent(settings)
 
 
@@ -334,6 +361,8 @@ def _repository_chat_embeddings(settings):
     """Choose the configured embedding adapter."""
     if settings.ai_provider.value == "ollama":
         return OllamaEmbeddingProvider(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiEmbeddingProvider(settings)
     return OpenAIEmbeddingProvider(settings)
 
 
@@ -341,6 +370,8 @@ def _repository_chat_agent(settings):
     """Choose the configured grounded-answer adapter."""
     if settings.ai_provider.value == "ollama":
         return OllamaGroundedChatAgent(settings)
+    if settings.ai_provider.value == "gemini":
+        return GeminiGroundedChatAgent(settings)
     return OpenAIGroundedChatAgent(settings)
 
 
@@ -348,6 +379,8 @@ def _embedding_model_name(settings) -> str:
     """Persist the model that generated vectors so an index remains traceable."""
     if settings.ai_provider.value == "ollama":
         return f"ollama/{settings.ollama_embedding_model}"
+    if settings.ai_provider.value == "gemini":
+        return f"gemini/{settings.gemini_embedding_model}/{settings.gemini_embedding_dimensions}"
     return settings.openai_embedding_model
 
 

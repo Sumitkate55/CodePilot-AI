@@ -41,7 +41,10 @@ def set_refresh_cookie(response: Response, request: Request, refresh_token: str)
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=settings.is_production,
-        samesite="lax",
+        # Vercel and Railway use different HTTPS origins in production. Browsers only attach
+        # the API-scoped refresh cookie to cross-origin XHR when SameSite=None is paired with
+        # Secure. Local development keeps the stricter, same-site default.
+        samesite="none" if settings.is_production else "lax",
         path=f"{settings.api_v1_prefix}/auth",
     )
 
@@ -53,7 +56,7 @@ def clear_refresh_cookie(response: Response, request: Request) -> None:
         key=settings.refresh_cookie_name,
         httponly=True,
         secure=settings.is_production,
-        samesite="lax",
+        samesite="none" if settings.is_production else "lax",
         path=f"{settings.api_v1_prefix}/auth",
     )
 

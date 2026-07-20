@@ -27,6 +27,7 @@ class AiProvider(StrEnum):
     """Supported providers for generation and repository embeddings."""
 
     OPENAI = "openai"
+    GEMINI = "gemini"
     OLLAMA = "ollama"
 
 
@@ -57,6 +58,12 @@ class Settings(BaseSettings):
     openai_repository_chat_model: str = "gpt-5"
     openai_embedding_model: str = "text-embedding-3-small"
     openai_timeout_seconds: int = Field(default=90, ge=10, le=600)
+    gemini_api_key: SecretStr | None = None
+    # Gemini 2.5 Flash is a stable, low-latency model with structured-output support.
+    gemini_generation_model: str = "gemini-2.5-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    gemini_embedding_dimensions: int = Field(default=768, ge=128, le=3072)
+    gemini_timeout_seconds: int = Field(default=120, ge=10, le=600)
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_chat_model: str = "qwen2.5-coder:3b"
     ollama_embedding_model: str = "nomic-embed-text"
@@ -86,8 +93,10 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
-        """Allow only explicitly supported SQLAlchemy async database schemes."""
+        """Allow supported SQLAlchemy async schemes and normalize Railway's Postgres URL."""
         scheme = urlparse(value).scheme
+        if scheme in {"postgres", "postgresql"}:
+            return f"postgresql+asyncpg://{value.split('://', maxsplit=1)[1]}"
         if scheme not in {"postgresql+asyncpg", "sqlite+aiosqlite"}:
             message = "DATABASE_URL must use postgresql+asyncpg or sqlite+aiosqlite."
             raise ValueError(message)

@@ -1,6 +1,9 @@
 """End-to-end authentication endpoint tests."""
 
 from httpx import AsyncClient
+from pydantic import SecretStr
+
+from codepilot_api.config.settings import AppEnvironment
 
 VALID_PASSWORD = "SecureCodePilot9"
 
@@ -28,6 +31,28 @@ async def test_registration_issues_access_token_and_refresh_cookie(client: Async
     assert body["user"]["email"] == "ada@example.com"
     assert "refresh_token" not in body
     assert client.cookies.get("codepilot_refresh")
+
+
+async def test_production_refresh_cookie_supports_vercel_to_api_requests(
+    client: AsyncClient, settings
+) -> None:
+    """A cross-origin Vercel UI needs a secure SameSite=None API cookie to refresh sessions."""
+    settings.app_env = AppEnvironment.PRODUCTION
+    settings.jwt_secret_key = SecretStr("a" * 32)
+
+    response = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "display_name": "Production Ada",
+            "email": "production-ada@example.com",
+            "password": VALID_PASSWORD,
+        },
+    )
+
+    cookie = response.headers["set-cookie"].lower()
+    assert response.status_code == 201
+    assert "secure" in cookie
+    assert "samesite=none" in cookie
 
 
 async def test_duplicate_registration_and_invalid_password_return_safe_errors(

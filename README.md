@@ -4,11 +4,18 @@ CodePilot AI turns a repository into an engineering workspace with repository in
 architecture maps, source-grounded chat, AI summaries, code explanations, code review,
 refactoring proposals, unit-test generation, and documentation generation.
 
-## Live demonstration
+## Hosted demonstration
 
-For assessment, share the supplied HTTPS **live-demo link** together with this GitHub repository.
-The live demo opens the complete application directly in a browser: no installation is required by
-the reviewer. It is backed by the same Docker deployment documented below.
+The production deployment is prepared for a public Vercel application backed by a private Railway
+API, PostgreSQL, Qdrant, persistent repository storage, and server-side Gemini. See
+[DEPLOYMENT.md](DEPLOYMENT.md) for the exact secure deployment layout and verification steps.
+
+For a quick end-to-end evaluation after opening the hosted application:
+
+1. Create an account.
+2. Add the public sample repository `https://github.com/Sumitkate55/CodePilot-AI.git`.
+3. Run repository intelligence, generate a summary, index it for chat, and ask a cited question.
+4. Inspect the architecture graph, static review, refactoring advisor, and generated documentation.
 
 ## Run locally
 
@@ -33,7 +40,7 @@ Open these URLs:
 
 Create an account, add a public GitHub repository or ZIP file, then choose **Analyze repository**.
 
-### Enable free local AI features
+### Enable local AI features
 
 In a second Terminal, run once:
 
@@ -48,7 +55,9 @@ project summaries, explanations, refactoring, test generation, and documentation
 OpenAI credits.
 
 If Ollama is not installed, authentication, uploads, repository intelligence, architecture graph,
-and deterministic code review still work. AI buttons show an actionable local-provider error.
+and deterministic code review still work. AI buttons show an actionable local-provider error. For
+the hosted deployment, set `AI_PROVIDER=gemini` and configure `GEMINI_API_KEY` only on Railway;
+never use a frontend `VITE_` variable for a secret.
 
 ### Stop the project
 
@@ -75,6 +84,31 @@ docker compose down -v
 - Repository-wide code review and AI refactoring advisor
 - pytest, Jest, and JUnit test generation
 - Workspace dashboard and repository activity history
+
+## Privacy and security
+
+- Each repository is scoped to its authenticated owner; IDs alone do not grant access.
+- Repository indexing excludes `.env`, credential-like files, and unsafe/binary paths before any
+  embedding request is made.
+- Production uses private Railway networking for PostgreSQL and Qdrant, plus persistent volumes for
+  repository data and vectors. Only the FastAPI API receives a public domain.
+- JWT secrets, database URLs, Qdrant addresses, and Gemini credentials are stored as backend
+  environment variables. They are never included in the Vite client bundle.
+- Repository chat answers are constrained to retrieved source chunks and return traceable file and
+  line citations.
+
+## Built with Codex and GPT-5.6
+
+CodePilot AI was developed in iterative, test-backed phases with Codex using GPT-5.6. Codex
+accelerated the workflow by analyzing the existing repository before each phase, preserving the
+Clean Architecture boundaries, implementing the FastAPI and React features, adding the Gemini
+provider abstraction, writing regression tests, preparing Docker/Railway/Vercel deployment assets,
+and running the lint, test, migration, Docker-build, and frontend-build checks.
+
+Key implementation decisions were to keep deterministic repository intelligence and static review
+separate from AI generation, use Qdrant retrieval plus citation validation to ground chat answers,
+exclude secrets before indexing, and keep AI/provider credentials server-side. The runtime can use
+local Ollama for a fully local demonstration or Gemini for a normal hosted website.
 
 ## Development checks
 
