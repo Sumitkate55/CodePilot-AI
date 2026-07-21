@@ -77,7 +77,9 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: SecretStr | None = None
     qdrant_collection_name: str = "codepilot_repository_chunks"
-    repository_rag_chunk_characters: int = Field(default=2_000, ge=500, le=8_000)
+    # Larger source chunks keep ordinary repositories within the free Gemini embedding
+    # request budget while still leaving the chat agent enough focused evidence to cite.
+    repository_rag_chunk_characters: int = Field(default=6_000, ge=500, le=8_000)
     repository_rag_chunk_overlap_lines: int = Field(default=12, ge=0, le=100)
     repository_rag_max_file_bytes: int = Field(default=512 * 1024, ge=4 * 1024, le=4 * 1024 * 1024)
     repository_rag_max_chunks: int = Field(default=10_000, ge=10, le=100_000)

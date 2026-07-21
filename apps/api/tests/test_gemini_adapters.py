@@ -45,6 +45,8 @@ def _summary_content() -> dict[str, object]:
 class _FakeResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self._payload = payload
+        self.status_code = 200
+        self.headers: dict[str, str] = {}
 
     def raise_for_status(self) -> None:
         return None
@@ -80,6 +82,13 @@ class _FakeHttpClient:
                 ]
             }
         )
+
+
+class _RateLimitedResponse(_FakeResponse):
+    def __init__(self) -> None:
+        super().__init__({"error": {"message": "Please retry shortly."}})
+        self.status_code = 429
+        self.headers = {"retry-after": "1"}
 
 
 @pytest.fixture
@@ -122,6 +131,51 @@ async def test_gemini_summary_and_embeddings_use_server_side_api(
         "taskType": "RETRIEVAL_DOCUMENT",
         "outputDimensionality": 768,
     }
+
+
+@pytest.mark.asyncio
+async def test_gemini_retries_transient_rate_limits(
+    monkeypatch, gemini_settings: Settings
+) -> None:
+    """A temporary provider quota response is retried before surfacing a failure."""
+
+    class _RetryingHttpClient(_FakeHttpClient):
+        calls: list[dict[str, object]] = []
+
+        def post(
+            self, url: str, *, headers: dict[str, str], json: dict[str, object]
+        ) -> _FakeResponse:
+            self.calls.append({"url": url, "headers": headers, "json": json})
+            if len(self.calls) == 1:
+                return _RateLimitedResponse()
+            return _FakeResponse(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": json_module.dumps(_summary_content())}]
+                            }
+                        }
+                    ]
+                }
+            )
+
+    _RetryingHttpClient.calls.clear()
+    monkeypatch.setattr(gemini_client_module.httpx, "Client", _RetryingHttpClient)
+    monkeypatch.setattr(gemini_client_module.time, "sleep", lambda _delay: None)
+    context = ProjectSummaryContext(
+        repository_id=uuid4(),
+        repository_version_id=uuid4(),
+        repository_name="Demo",
+        source_type="zip",
+        remote_url=None,
+        analysis_results={"statistics": {"total_files": 1}},
+    )
+
+    summary = await GeminiProjectSummaryAgent(gemini_settings).generate(context)
+
+    assert summary.content["overview"]["summary"] == "Grounded summary."
+    assert len(_RetryingHttpClient.calls) == 2
 
 
 @pytest.mark.asyncio

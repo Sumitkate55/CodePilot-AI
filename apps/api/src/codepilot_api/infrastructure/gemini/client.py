@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import random
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -11,6 +13,9 @@ from pydantic import BaseModel, ValidationError
 
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 MAX_EMBEDDING_BATCH_SIZE = 100
+MAX_TRANSIENT_RETRIES = 6
+MAX_RETRY_DELAY_SECONDS = 30.0
+TRANSIENT_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 class GeminiUnavailableError(Exception):
@@ -126,29 +131,41 @@ class GeminiClient:
         return vectors
 
     def _post(self, path: str, payload: dict[str, Any], model: str) -> dict[str, Any]:
-        try:
-            with httpx.Client(timeout=self._timeout_seconds) as client:
-                response = client.post(
-                    f"{GEMINI_API_BASE_URL}{path}",
-                    headers={"x-goog-api-key": self._api_key},
-                    json=payload,
-                )
-                response.raise_for_status()
-        except httpx.ConnectError as error:
-            raise GeminiUnavailableError(
-                "Gemini could not be reached from the API server."
-            ) from error
-        except httpx.TimeoutException as error:
-            raise GeminiUnavailableError(
-                "Gemini did not respond before the configured timeout. Please retry."
-            ) from error
-        except httpx.HTTPStatusError as error:
-            detail = self._error_detail(error.response)
-            raise GeminiResponseError(
-                f"Gemini could not use model '{model}'. {detail}"
-            ) from error
-        except httpx.HTTPError as error:
-            raise GeminiUnavailableError("CodePilot could not communicate with Gemini.") from error
+        for attempt in range(MAX_TRANSIENT_RETRIES + 1):
+            try:
+                with httpx.Client(timeout=self._timeout_seconds) as client:
+                    response = client.post(
+                        f"{GEMINI_API_BASE_URL}{path}",
+                        headers={"x-goog-api-key": self._api_key},
+                        json=payload,
+                    )
+                    if (
+                        response.status_code in TRANSIENT_STATUS_CODES
+                        and attempt < MAX_TRANSIENT_RETRIES
+                    ):
+                        time.sleep(self._retry_delay_seconds(response, attempt))
+                        continue
+                    response.raise_for_status()
+            except httpx.ConnectError as error:
+                raise GeminiUnavailableError(
+                    "Gemini could not be reached from the API server."
+                ) from error
+            except httpx.TimeoutException as error:
+                raise GeminiUnavailableError(
+                    "Gemini did not respond before the configured timeout. Please retry."
+                ) from error
+            except httpx.HTTPStatusError as error:
+                detail = self._error_detail(error.response)
+                raise GeminiResponseError(
+                    f"Gemini could not use model '{model}'. {detail}"
+                ) from error
+            except httpx.HTTPError as error:
+                raise GeminiUnavailableError(
+                    "CodePilot could not communicate with Gemini."
+                ) from error
+            break
+        else:  # pragma: no cover - retained for defensive completeness.
+            raise GeminiUnavailableError("Gemini retry attempts were exhausted.")
         try:
             body = response.json()
         except ValueError as error:
@@ -156,6 +173,19 @@ class GeminiClient:
         if not isinstance(body, dict):
             raise GeminiResponseError("Gemini returned an invalid response.")
         return body
+
+    @staticmethod
+    def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
+        """Honor a provider retry hint, then fall back to bounded exponential backoff."""
+        retry_after = response.headers.get("retry-after")
+        if retry_after:
+            try:
+                delay = float(retry_after)
+            except ValueError:
+                delay = 0.0
+            if delay > 0:
+                return min(delay, MAX_RETRY_DELAY_SECONDS)
+        return min(2.0**attempt, MAX_RETRY_DELAY_SECONDS) + random.uniform(0.0, 0.5)
 
     @staticmethod
     def _candidate_text(response: Mapping[str, Any]) -> str:
