@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import threading
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -16,6 +17,10 @@ MAX_EMBEDDING_BATCH_SIZE = 100
 MAX_TRANSIENT_RETRIES = 6
 MAX_RETRY_DELAY_SECONDS = 30.0
 TRANSIENT_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+# Gemini Free currently limits the generation endpoint to a small request-per-minute
+# budget. Keep one API process below that threshold even when different dashboard
+# tools are clicked quickly.
+GENERATION_REQUEST_INTERVAL_SECONDS = 3.5
 
 
 class GeminiUnavailableError(Exception):
@@ -32,6 +37,9 @@ class GeminiClient:
     The API key is sent only from the backend in an HTTP header. It is never part of a
     browser response, client-side bundle, log message, or persisted project artifact.
     """
+
+    _generation_request_lock = threading.Lock()
+    _next_generation_request_at = 0.0
 
     def __init__(self, api_key: str, timeout_seconds: int) -> None:
         self._api_key = api_key
@@ -77,6 +85,7 @@ class GeminiClient:
         response_schema: type[BaseModel],
         max_output_tokens: int | None,
     ) -> BaseModel:
+        self._wait_for_generation_slot()
         generation_config: dict[str, Any] = {
             "responseMimeType": "application/json",
             "responseJsonSchema": response_schema.model_json_schema(),
@@ -155,6 +164,11 @@ class GeminiClient:
                     "Gemini did not respond before the configured timeout. Please retry."
                 ) from error
             except httpx.HTTPStatusError as error:
+                if error.response.status_code == httpx.codes.TOO_MANY_REQUESTS:
+                    raise GeminiResponseError(
+                        "Gemini's free request limit is temporarily reached. Wait about one "
+                        "minute, then retry a single AI action."
+                    ) from error
                 detail = self._error_detail(error.response)
                 raise GeminiResponseError(
                     f"Gemini could not use model '{model}'. {detail}"
@@ -173,6 +187,19 @@ class GeminiClient:
         if not isinstance(body, dict):
             raise GeminiResponseError("Gemini returned an invalid response.")
         return body
+
+    @classmethod
+    def _wait_for_generation_slot(cls) -> None:
+        """Serialize generation calls so the shared free-tier quota is not burst."""
+        with cls._generation_request_lock:
+            now = time.monotonic()
+            scheduled_at = max(now, cls._next_generation_request_at)
+            cls._next_generation_request_at = (
+                scheduled_at + GENERATION_REQUEST_INTERVAL_SECONDS
+            )
+        delay = scheduled_at - now
+        if delay > 0:
+            time.sleep(delay)
 
     @staticmethod
     def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:

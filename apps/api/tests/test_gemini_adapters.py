@@ -16,6 +16,7 @@ from codepilot_api.infrastructure.chat.gemini_repository_chat import (
     GeminiGroundedChatAgent,
 )
 from codepilot_api.infrastructure.gemini import client as gemini_client_module
+from codepilot_api.infrastructure.gemini.client import GeminiClient
 from codepilot_api.infrastructure.summaries.gemini_project_summary_agent import (
     GeminiProjectSummaryAgent,
 )
@@ -176,6 +177,24 @@ async def test_gemini_retries_transient_rate_limits(
 
     assert summary.content["overview"]["summary"] == "Grounded summary."
     assert len(_RetryingHttpClient.calls) == 2
+
+
+def test_gemini_serializes_generation_requests_to_protect_free_quota(monkeypatch) -> None:
+    """Back-to-back generation calls are spaced before reaching Gemini."""
+    original_next_request = GeminiClient._next_generation_request_at
+    try:
+        GeminiClient._next_generation_request_at = 0.0
+        monotonic_values = iter((100.0, 101.0))
+        delays: list[float] = []
+        monkeypatch.setattr(gemini_client_module.time, "monotonic", lambda: next(monotonic_values))
+        monkeypatch.setattr(gemini_client_module.time, "sleep", delays.append)
+
+        GeminiClient._wait_for_generation_slot()
+        GeminiClient._wait_for_generation_slot()
+
+        assert delays == [2.5]
+    finally:
+        GeminiClient._next_generation_request_at = original_next_request
 
 
 @pytest.mark.asyncio
