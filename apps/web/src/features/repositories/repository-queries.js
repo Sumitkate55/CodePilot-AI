@@ -101,6 +101,9 @@ export function useRepositoryCodeReviewRun() {
     mutationFn: reviewRepositoryCode,
     onSuccess: (review, repositoryId) => {
       queryClient.setQueryData(repositoryKeys.codeReview(repositoryId), review);
+      // The advisor query may have previously returned 404 before a review existed.
+      // Refetch it immediately so the user can generate a proposal without reloading.
+      queryClient.invalidateQueries({ queryKey: repositoryKeys.refactoring(repositoryId) });
     },
   });
 }
